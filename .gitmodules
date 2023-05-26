@@ -1,3 +1,4 @@
 [submodule "Explicit-MATLAB"]
 	path = Explicit-MATLAB
 	url = https://github.com/explicit-robotics/Explicit-MATLAB
+	branch = main
