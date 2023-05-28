@@ -12,7 +12,7 @@
 clear; close all; clc;
 
 % Simulation settings
-simTime = 5;        % Total simulation time
+simTime = 3;        % Total simulation time
 t  = 0;             % The current time of simulation   
 dt = 0.001;         % Time-step of simulation 
 
@@ -25,6 +25,8 @@ anim = Animation( 'Dimension', 3, 'xLim', [-0.9,0.9], 'yLim', [-0.9,0.9], 'zLim'
 anim.init( );
 anim.attachRobot( robot ) 
 
+
+view( 90, 0 );
 set( anim.hFig, 'units','normalized','outerposition',[0 0 1 1] )
 
 % Update kinematics
@@ -36,7 +38,6 @@ titleString = sprintf( 'Time: %2.1f sec', 0 );
 mytitle = title( titleString );
 set( mytitle, 'FontSize' , 15);
 
-view( 90, 0 );
 % Point-to-point Joint Space Impedance Controller
 % Using Minimum-jerk trajectory as the virtual trajectory 
 
@@ -74,14 +75,13 @@ pEE_mark = scatter3( anim.hAxes, pi( 1 ), pi( 2 ), pi( 3 ), 'filled', 'markeredg
 while t <= simTime
     
     % Get the mass matrix of the Acrobot
-    M2 = robot.getMassMatrix2( q );
-%     M1 = robot.getMassMatrix( q );
-    
+    M = robot.getMassMatrix( q );
+
     % Get the Coriolis term of the robot
-    C = robot.getCoriolisMatrix2( q, dq );
+    C = robot.getCoriolisMatrix( q, dq );
     
     % Get the Gravity term of the robot
-    G = robot.getGravityVector2( q );
+    G = robot.getGravityVector( q );
 
     % Get the Hybrid Jacobian 
     JH = robot.getHybridJacobian( q );
@@ -118,7 +118,7 @@ while t <= simTime
     tau2 = JHr' * ( kr * Rcurr * w * theta - br * JHr * dq );
 
     tau = tau1 + tau2 - Bq * dq;
-    rhs = M2\( -C * dq + tau ); 
+    rhs = M\( -C * dq + tau ); 
 
 %     rhs = zeros( robot.nq, 1 );
     
