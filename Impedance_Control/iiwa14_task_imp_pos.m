@@ -12,7 +12,7 @@
 clear; close all; clc;
 
 % Simulation settings
-simTime = 5;        % Total simulation time
+simTime = 40;        % Total simulation time
 t  = 0;             % The current time of simulation   
 dt = 0.001;         % Time-step of simulation 
 
@@ -23,10 +23,14 @@ robot.init( );
 % Create animation
 anim = Animation( 'Dimension', 3, 'xLim', [-0.9,0.9], 'yLim', [-0.9,0.9], 'zLim', [0,1.8], 'isSaveVideo', true );
 anim.init( );
+
+view( 90, 90 )
+
 anim.attachRobot( robot ) 
 
 % Update kinematics
-robot.updateKinematics( robot.q_init );
+q_init = [0, 28.56, 0, -87.36, -7.82, 75.56, -9.01]' * pi/180;
+robot.updateKinematics( q_init );
 anim.update( 0 );
 
 % Title: simulation time
@@ -38,7 +42,7 @@ set( mytitle, 'FontSize' , 15);
 % Using Minimum-jerk trajectory as the virtual trajectory 
 
 % Initial joint posture and velocity
-q  = robot.q_init;
+q  = q_init;
 dq = zeros( robot.nq, 1 );
 
 % The initial end-effector position 
@@ -46,7 +50,10 @@ Hi = robot.getForwardKinematics( q );
 pi = Hi( 1:3, 4 );
 
 % Desired final posture 
-pf = pi + [0.; 0.4; 0];
+delx = [0.2; 0.0; 0];
+dely = [0.0; 0.2; 0];
+
+toff = 0.5;
 
 % Time step for the simulation
 ns = 0;
@@ -55,28 +62,38 @@ ns = 0;
 Kp = 400 * eye( 3 );
 Bp = 0.1 * Kp;
 
-Bq = 0.5 * eye( robot.nq );
+Bq = .8 * eye( robot.nq );
 
 t0 = 0.1;
-D  = 0.8;
+D  = 1.6;
+
+t_freq = 8 * ( D + toff );
 
 while t <= simTime
     
     % Get the mass matrix of the Acrobot
-    M2 = robot.getMassMatrix2( q );
-%     M1 = robot.getMassMatrix( q );
-    
-    % Get the Coriolis term of the robot
-    C = robot.getCoriolisMatrix2( q, dq );
-    
+    M = robot.getMassMatrix( q );
+    C = robot.getCoriolisMatrix( q, dq );
+
     % Get the Gravity term of the robot
-    G = robot.getGravityVector2( q );
+    G = robot.getGravityVector( q );
 
     % Get the Hybrid Jacobian 
     JH = robot.getHybridJacobian( q );
     
     % The joint-space impedance controller
-    [ p_ref, dp_ref, ~ ] = min_jerk_traj( t0, t, D, pi, pf );
+    [ p_ref1, dp_ref1, ~ ] = min_jerk_traj( t0                 , rem( t, t_freq ), D, pi, pi + dely );
+    [ p_ref2, dp_ref2, ~ ] = min_jerk_traj( t0 +      D + toff , rem( t, t_freq ), D, zeros( 3, 1 ), -dely );
+    [ p_ref3, dp_ref3, ~ ] = min_jerk_traj( t0 + 2 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ),  delx );    
+    [ p_ref4, dp_ref4, ~ ] = min_jerk_traj( t0 + 3 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ), -delx );  
+    [ p_ref5, dp_ref5, ~ ] = min_jerk_traj( t0 + 4 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ), -dely );
+    [ p_ref6, dp_ref6, ~ ] = min_jerk_traj( t0 + 5 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ),  dely );
+    [ p_ref7, dp_ref7, ~ ] = min_jerk_traj( t0 + 6 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ), -delx );
+    [ p_ref8, dp_ref8, ~ ] = min_jerk_traj( t0 + 7 * (D + toff), rem( t, t_freq ), D, zeros( 3, 1 ),  delx );
+
+
+    p_ref  =  p_ref1 +  p_ref2 +  p_ref3 +  p_ref4 +  p_ref5 +  p_ref6 +  p_ref7 +  p_ref8;
+    dp_ref = dp_ref1 + dp_ref2 + dp_ref3 + dp_ref4 + dp_ref5 + dp_ref6 + dp_ref7 + dp_ref8;
 
     % Get the end-effector position and velocity 
     dp = JH( 1:3, : ) * dq;
@@ -85,8 +102,10 @@ while t <= simTime
     H = robot.getForwardKinematics( q );
     p = H( 1:3, 4 );
 
+    % Summing up the minimum-jerk trajectories
+
     tau = JH( 1:3, : )' * ( Kp * ( p_ref - p ) + Bp * ( dp_ref - dp ) ) - Bq * dq;
-    rhs = M2\( -C * dq + tau ); 
+    rhs = M\( -C * dq + tau ); 
 
 %     rhs = zeros( robot.nq, 1 );
     
