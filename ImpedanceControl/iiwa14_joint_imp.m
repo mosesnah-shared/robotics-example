@@ -12,10 +12,11 @@ clear; close all; clc;
 %%  -- (1A) Parameters for Simulation
 
 % Simulation settings
-T  =  6;            % Total simulation time
-t  =  0;            % The current time of simulation   
-dt = 1e-4;          % Time-step of simulation 
-t_arr = 0:dt:T;     % Time array
+T  =  6;              % Total simulation time
+t  =  0;              % The current time of simulation   
+dt = 1e-4;            % Time-step of simulation 
+t_arr = 0:dt:T;       % Time array
+Nt = length( t_arr ); % The number of elements for time array
 
 % Define robot, initialization
 robot = iiwa14( 'high' );
@@ -59,8 +60,10 @@ ns = 1;
 Kq = 2.0 * eye( robot.nq );
 Bq = 0.5 * eye( robot.nq );
 
-while t <= T
-    
+for i = 1 : Nt
+
+    t = t_arr( i );
+
     % Get the mass matrix of the Acrobot
     M = robot.getMassMatrix( q );
     C = robot.getCoriolisMatrix( q, dq );
@@ -71,7 +74,7 @@ while t <= T
     % Get the Hybrid Jacobian 
     JH = robot.getHybridJacobian( q );
   
-    tau = Kq * ( q0( :, n ) - q ) + Bq * ( dq0( :, n ) - dq );
+    tau = Kq * ( q0( :, i ) - q ) + Bq * ( dq0( :, i ) - dq );
     rhs = M\( -C * dq + tau ); 
     
     [ q1, dq1 ] = func_symplecticEuler( q, dq, rhs, dt );
@@ -92,10 +95,6 @@ while t <= T
         
     end
 
-    % Get the forward kinematics of the EE
-    t  = t + dt;             
-    n  = n + 1;
-    
 end
 
 anim.close( )

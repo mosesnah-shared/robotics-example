@@ -2,3 +2,6 @@
 	path = Explicit-MATLAB
 	url = https://github.com/explicit-robotics/Explicit-MATLAB
 	branch = main
+[submodule "GeometryLibrary"]
+	path = GeometryLibrary
+	url = https://github.com/mosesnah-shared/GeometryLibrary
