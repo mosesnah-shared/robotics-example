@@ -1,4 +1,4 @@
-% [Title]     Task-space Impedance Control, Position and Orientation Type1
+% [Title]     Task-space Impedance Control, Position and Orientation Type2
 % [Author]    Moses Chong-ook Nah
 % [Email]     mosesnah@mit.edu
 % [Update]    At 2023.11.27
@@ -14,7 +14,7 @@ clear; close all; clc;
 % Simulation settings
 T   =   20;            % Total simulation time
 t   =    0;            % The current time of simulation   
-t0i =  0.1;            % Initial time start of movement
+t0i =  0.0;            % Initial time start of movement
 dt  = 1e-4;            % Time-step of simulation 
 t_arr  = 0:dt:T;       % Time array
 Nt  = length( t_arr ); % Number of time-array elements
@@ -51,7 +51,7 @@ D    = 1.5;
 % Get the initial end-effector position and orientation 
 Hi = robot.getForwardKinematics( q_init );
 Ri = Hi( 1:3, 1:3 );
-pi = Hi( 1:3,   4 );
+pi = Hi( 1:3,   4 ); 
 
 % Generate the min-jerk movements 
 [ p_tmp1, dp_tmp1, ~ ] = min_jerk_traj(            pi, pi + delx, D, t_arr, t0i                    );
@@ -68,14 +68,10 @@ pi = Hi( 1:3,   4 );
  dp0_arr =  dp_tmp1 +  dp_tmp2 +  dp_tmp3 +  dp_tmp4 +  dp_tmp5 +  dp_tmp6 +  dp_tmp7 +  dp_tmp8;
 
 % Plotting this to anim
-p_tmp1 = p_tmp1 + pi;
-p_tmp2 = p_tmp2 + pi;
-p_tmp3 = p_tmp3 + pi;
-p_tmp4 = p_tmp4 + pi;
-p_tmp5 = p_tmp5 + pi;
-p_tmp6 = p_tmp6 + pi;
-p_tmp7 = p_tmp7 + pi;
-p_tmp8 = p_tmp8 + pi;
+p_tmp1 = p_tmp1 + pi; p_tmp2 = p_tmp2 + pi;
+p_tmp3 = p_tmp3 + pi; p_tmp4 = p_tmp4 + pi;
+p_tmp5 = p_tmp5 + pi; p_tmp6 = p_tmp6 + pi;
+p_tmp7 = p_tmp7 + pi; p_tmp8 = p_tmp8 + pi;
 
 plot3( anim.hAxes, p_tmp1( 1, : ), p_tmp1( 2, : ), p_tmp1( 3, : ), 'linewidth', 3, 'color', 'k' )
 plot3( anim.hAxes, p_tmp2( 1, : ), p_tmp2( 2, : ), p_tmp2( 3, : ), 'linewidth', 3, 'color', 'k' )
@@ -90,6 +86,12 @@ plot3( anim.hAxes, p_tmp8( 1, : ), p_tmp8( 2, : ), p_tmp8( 3, : ), 'linewidth', 
 q  = q_init;
 dq = zeros( robot.nq, 1 );
 
+%% -- (1D) Getting the symbolic form of the rotation matrix
+q_sym = sym( 'q', [7, 1]);
+H_sym = robot.getForwardKinematics( q_sym );
+R_sym = H_sym( 1:3, 1:3 );
+
+
 %% -- (1C) Main Simulation
 
 % Time step for the simulation
@@ -102,9 +104,12 @@ Bp = 0.1 * Kp;
 % Joint-space impedance, damping
 Bq = .8 * eye( robot.nq );
 
-% Task-space impedances for Orientation
-Kr = 6.0 * eye( 3 );
-Br = 0.6 * eye( 3 );
+% Task-space impedances for Orientation, SO3
+GR = 4 * eye( 3 );
+
+% Task-space impedances for Orientation, unit_quat
+% It is a co-stiffness matrix 
+Keps = trace( GR ) * eye( 3 ) - GR;
 
 % The whole movement's frequency
 t_freq = t0i + 8 * ( D + toff ) - toff;
@@ -131,9 +136,31 @@ for i = 1 : Nt
 
     ii = rem( i , N_freq )+1;
     tau1 = JH( 1:3, : )' * ( Kp * ( p0_arr( :, ii ) - p ) + Bp * ( dp0_arr( :, ii ) - dp ) );
-    tau2 = JH( 4:6, : )' * Kr * R * so3_to_R3( LogSO3( R' * Ri ) );
-    tau3 = - Bq * dq;
-    tau  = tau1 + tau2 + tau2;
+    tau2 = - Bq * dq;
+
+    % Calculate the Torque for SO3
+    Ur = -trace( GR * R_sym.' * R );
+    tau3_SO3 = zeros( 7, 1 );
+    tau3_SO3( 1 ) = double( subs( diff( Ur, q_sym( 1 ) ), q_sym, q ) );
+    tau3_SO3( 2 ) = double( subs( diff( Ur, q_sym( 2 ) ), q_sym, q ) );
+    tau3_SO3( 3 ) = double( subs( diff( Ur, q_sym( 3 ) ), q_sym, q ) );
+    tau3_SO3( 4 ) = double( subs( diff( Ur, q_sym( 4 ) ), q_sym, q ) );
+    tau3_SO3( 5 ) = double( subs( diff( Ur, q_sym( 5 ) ), q_sym, q ) );
+    tau3_SO3( 6 ) = double( subs( diff( Ur, q_sym( 6 ) ), q_sym, q ) );
+    tau3_SO3( 7 ) = double( subs( diff( Ur, q_sym( 7 ) ), q_sym, q ) );
+    
+    % Calculate the Torque for unit quaternion
+    tmp_quat = SO3_to_quat( R' * Ri );
+    eta      = tmp_quat( 1 );
+    eps_vec  = tmp_quat( 2:4 );
+
+    E = eta * eye( 3 ) - R3_to_so3( eps_vec );
+
+    tau3_H1  = JH( 4:6, : )' * R * 2 * E * Keps * eps_vec';
+
+    max( abs( tau3_H1 - tau3_SO3 ) )
+
+    tau  = tau1 + tau2 + tau3_SO3;
 
     rhs = M\( -C * dq + tau ); 
 
