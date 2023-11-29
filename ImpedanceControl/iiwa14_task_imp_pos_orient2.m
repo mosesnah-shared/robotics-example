@@ -41,8 +41,8 @@ set( mytitle, 'FontSize' , 15);
 %% -- (1B) Motion Planning of end-effector 
 
 % delta movements
-delx = [0.2; 0.0; 0];
-dely = [0.0; 0.2; 0];
+delx = [ 0.2; 0.0; 0.0 ];
+dely = [ 0.0; 0.2; 0.0 ];
 
 % Time-offset between, duration of movements 
 toff = 0.5;
@@ -68,10 +68,8 @@ pi = Hi( 1:3,   4 );
  dp0_arr =  dp_tmp1 +  dp_tmp2 +  dp_tmp3 +  dp_tmp4 +  dp_tmp5 +  dp_tmp6 +  dp_tmp7 +  dp_tmp8;
 
 % Plotting this to anim
-p_tmp1 = p_tmp1 + pi; p_tmp2 = p_tmp2 + pi;
-p_tmp3 = p_tmp3 + pi; p_tmp4 = p_tmp4 + pi;
-p_tmp5 = p_tmp5 + pi; p_tmp6 = p_tmp6 + pi;
-p_tmp7 = p_tmp7 + pi; p_tmp8 = p_tmp8 + pi;
+p_tmp1 = p_tmp1 + pi; p_tmp2 = p_tmp2 + pi; p_tmp3 = p_tmp3 + pi; p_tmp4 = p_tmp4 + pi;
+p_tmp5 = p_tmp5 + pi; p_tmp6 = p_tmp6 + pi; p_tmp7 = p_tmp7 + pi; p_tmp8 = p_tmp8 + pi;
 
 plot3( anim.hAxes, p_tmp1( 1, : ), p_tmp1( 2, : ), p_tmp1( 3, : ), 'linewidth', 3, 'color', 'k' )
 plot3( anim.hAxes, p_tmp2( 1, : ), p_tmp2( 2, : ), p_tmp2( 3, : ), 'linewidth', 3, 'color', 'k' )
@@ -87,10 +85,21 @@ q  = q_init;
 dq = zeros( robot.nq, 1 );
 
 %% -- (1D) Getting the symbolic form of the rotation matrix
+
+% Task-space impedances for Orientation, SO3
+GR = 4 * eye( 3 );
+
+% Task-space impedances for Orientation, unit_quat
+% It is a co-stiffness matrix 
+Keps = trace( GR ) * eye( 3 ) - GR;
+
 q_sym = sym( 'q', [7, 1]);
 H_sym = robot.getForwardKinematics( q_sym );
 R_sym = H_sym( 1:3, 1:3 );
 
+% For simplicity, we calculate in advance the components of the torque
+Ur = trace( GR * R_sym.' * Ri );
+func_tau_SO3 = matlabFunction( gradient( Ur, q_sym ) );
 
 %% -- (1C) Main Simulation
 
@@ -103,13 +112,6 @@ Bp = 0.1 * Kp;
 
 % Joint-space impedance, damping
 Bq = .8 * eye( robot.nq );
-
-% Task-space impedances for Orientation, SO3
-GR = 4 * eye( 3 );
-
-% Task-space impedances for Orientation, unit_quat
-% It is a co-stiffness matrix 
-Keps = trace( GR ) * eye( 3 ) - GR;
 
 % The whole movement's frequency
 t_freq = t0i + 8 * ( D + toff ) - toff;
@@ -139,15 +141,7 @@ for i = 1 : Nt
     tau2 = - Bq * dq;
 
     % Calculate the Torque for SO3
-    Ur = -trace( GR * R_sym.' * R );
-    tau3_SO3 = zeros( 7, 1 );
-    tau3_SO3( 1 ) = double( subs( diff( Ur, q_sym( 1 ) ), q_sym, q ) );
-    tau3_SO3( 2 ) = double( subs( diff( Ur, q_sym( 2 ) ), q_sym, q ) );
-    tau3_SO3( 3 ) = double( subs( diff( Ur, q_sym( 3 ) ), q_sym, q ) );
-    tau3_SO3( 4 ) = double( subs( diff( Ur, q_sym( 4 ) ), q_sym, q ) );
-    tau3_SO3( 5 ) = double( subs( diff( Ur, q_sym( 5 ) ), q_sym, q ) );
-    tau3_SO3( 6 ) = double( subs( diff( Ur, q_sym( 6 ) ), q_sym, q ) );
-    tau3_SO3( 7 ) = double( subs( diff( Ur, q_sym( 7 ) ), q_sym, q ) );
+    tau3_SO3 = func_tau_SO3( q( 1 ), q( 2 ), q( 3 ), q( 4 ), q( 5 ), q( 6 ), q( 7 ) );
     
     % Calculate the Torque for unit quaternion
     tmp_quat = SO3_to_quat( R' * Ri );
@@ -156,11 +150,11 @@ for i = 1 : Nt
 
     E = eta * eye( 3 ) - R3_to_so3( eps_vec );
 
-    tau3_H1  = JH( 4:6, : )' * R * 2 * E * Keps * eps_vec';
+    tau3_H1  = 2 * JH( 4:6, : )' * R * E' * Keps * eps_vec';
 
     max( abs( tau3_H1 - tau3_SO3 ) )
 
-    tau  = tau1 + tau2 + tau3_SO3;
+    tau  = tau1 + tau2 + tau3_H1;
 
     rhs = M\( -C * dq + tau ); 
 

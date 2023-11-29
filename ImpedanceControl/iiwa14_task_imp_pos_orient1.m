@@ -68,14 +68,8 @@ pi = Hi( 1:3,   4 );
  dp0_arr =  dp_tmp1 +  dp_tmp2 +  dp_tmp3 +  dp_tmp4 +  dp_tmp5 +  dp_tmp6 +  dp_tmp7 +  dp_tmp8;
 
 % Plotting this to anim
-p_tmp1 = p_tmp1 + pi;
-p_tmp2 = p_tmp2 + pi;
-p_tmp3 = p_tmp3 + pi;
-p_tmp4 = p_tmp4 + pi;
-p_tmp5 = p_tmp5 + pi;
-p_tmp6 = p_tmp6 + pi;
-p_tmp7 = p_tmp7 + pi;
-p_tmp8 = p_tmp8 + pi;
+p_tmp1 = p_tmp1 + pi; p_tmp2 = p_tmp2 + pi; p_tmp3 = p_tmp3 + pi; p_tmp4 = p_tmp4 + pi;
+p_tmp5 = p_tmp5 + pi; p_tmp6 = p_tmp6 + pi; p_tmp7 = p_tmp7 + pi; p_tmp8 = p_tmp8 + pi;
 
 plot3( anim.hAxes, p_tmp1( 1, : ), p_tmp1( 2, : ), p_tmp1( 3, : ), 'linewidth', 3, 'color', 'k' )
 plot3( anim.hAxes, p_tmp2( 1, : ), p_tmp2( 2, : ), p_tmp2( 3, : ), 'linewidth', 3, 'color', 'k' )
