@@ -10,4 +10,4 @@ clear; close all; clc;
 run( './Explicit-MATLAB/setup.m' )
 
 % Add path for Impedance Control Examples
-addpath( './ImpedanceControl', './utils' , './GeometryLibrary/MATLAB' )
+addpath( './ImpedanceControl', './utils' , './examples', './GeometryLibrary/MATLAB' )

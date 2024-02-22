@@ -100,7 +100,7 @@ R_sym = H_sym( 1:3, 1:3 );
 % For simplicity, we calculate in advance the components of the torque
 Ur = trace( GR * R_sym.' * Ri );
 func_tau_SO3 = matlabFunction( gradient( Ur, q_sym ) );
-
+    
 %% -- (1C) Main Simulation
 
 % Time step for the simulation
